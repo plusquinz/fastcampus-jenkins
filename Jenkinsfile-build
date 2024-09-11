@@ -4,6 +4,7 @@ pipeline {
 
     // 환경 변수 지정
 
+
     environment {
         // jenkins 가 관리하는 도구의 위치는 이와 같이 환경 변수로 저장 가능
         SONAR_SCANNER_HOME = tool name: 'sonar-scanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
@@ -18,9 +19,8 @@ pipeline {
         // 빌드를 5개만 유지
         buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '5', numToKeepStr: '5')
         // github 프로젝트 설정
-        githubProjectProperty(displayName: '', projectUrlStr: 'https://github.com/fastcampus-jenkins/fastcampus-jenkins')
+        githubProjectProperty(displayName: '', projectUrlStr: 'https://github.com/plusquinz/fastcampus-jenkins')
     }
-
 
     // stages > stage > steps 순으로 구성
     stages {
@@ -56,7 +56,24 @@ pipeline {
                 }
             }
         }
-       
+        /*
+        * Jenkinsfile 을 Repo 에서 가져오도록 설정할 경우, 별도의 Checkout Stage 불필요.
+        * 다음 실습 마지막에 제거 예정
+        */
+        stage('Checkout') {
+            steps {
+                checkout scmGit(
+                        branches: [[name: "${params.BRANCH}"]],
+                        userRemoteConfigs: [[
+                            // credential id 는 http://localhost:8080/pipeline-syntax/ 에서 checkout step 생성을 통해 확인 가능
+                            credentialsId: 'github-ssh',
+                            url: 'git@github.com:plusquinz/fastcampus-jenkins.git']
+                        ],
+                        extensions: [[$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [[path: 'projects/spring-app']]]]
+                )
+            }
+        }
+
 
         stage('Build') {
             steps {
@@ -70,11 +87,7 @@ pipeline {
             }
         }
 
-
         stage('SonarScanner') {
-            when {
-                environment name: "GIT_BRANCH", value: "origin/main"
-            }
             steps {
                 // sonarqube 환경하에서, 실행
                 withSonarQubeEnv("sonarqube-server") {
@@ -97,16 +110,16 @@ pipeline {
         }
     }
 
-    // post 는 stage 마다 실행시킬 수도 있고, 전체 stages가 완료된 다음에 실행 시킬 수도 있음
+    // post 는 stage 마다 실행시킬 수도 있고, 전체가 stages가 완료된 다음에 실행 시킬 수도 있음
+
     post {
         always {
             scanForIssues tool: ktLint(pattern: '**/ktlint/**/*.xml')
             junit '**/test-results/**/*.xml'
             jacoco sourcePattern: '**/src/main/kotlin'
             mineRepository()
-            emailext attachLog: true, body: email_content(), subject: email_subject(), to: 'junoyoon@gmail.com'
-            slackSend channel: "#jenkins", message: "${custom_msg(currentBuild.currentResult)}"
-
+            //emailext attachLog: true, body: email_content(), subject: email_subject(), to: '각자의이메일주소'
+            //slackSend channel: "#jenkins", message: "${custom_msg(currentBuild.currentResult)}"
         }
 
         success {
@@ -114,17 +127,16 @@ pipeline {
             script {
                 if (params.DEPLOY_ENABLED == true) {
                     build(
-                           job: 'pipeline-deploy',
-                           parameters: [booleanParam(name: 'ARE_YOU_SURE', value: "true")],
-                           wait: false,
-                           propagate: false
+                        job: 'pipeline-deploy',
+                        parameters: [booleanParam(name: 'ARE_YOU_SURE', value: "true")],
+                        wait: false,
+                        propagate: false
                     )
                 }
             }
         }
     }
 }
-
 
 def email_subject() {
     return '빌드통지!! - ${DEFAULT_SUBJECT}'
@@ -142,7 +154,6 @@ def custom_msg(status) {
     return " $status: Job [${env.JOB_NAME}] Logs path: ${env.BUILD_URL}/consoleText"
 }
 
-
 def groovy_script() {
   return '''if (BRANCH == "") {
       return "origin/main 가 빌드 됩니다."
@@ -150,4 +161,3 @@ def groovy_script() {
       return "$BRANCH 가 빌드 됩니다."
   }'''
 }
-
