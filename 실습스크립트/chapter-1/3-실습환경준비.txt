@@ -80,11 +80,3 @@ docker run -d --rm --name=cicd \
 
 docker exec cicd apt-get update
 docker exec cicd apt-get install -y vim
-
-
-
-
-
-
-
-
