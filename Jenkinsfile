@@ -16,12 +16,10 @@ pipeline {
         githubProjectProperty(displayName: '', projectUrlStr: 'https://github.com/fastcampus-jenkins/fastcampus-jenkins')
         // 디폴트 checkout skip 설정 제거
     }
-
-      triggers {
+    
+    triggers {
             issueCommentTrigger('.*(test this|build this|deploy this).*')
-      }
-      
-  
+    }
     // stages > stage > steps 순으로 구성
     stages {
         stage('Build') {
@@ -36,7 +34,7 @@ pipeline {
         }
 
         stage('SonarScanner') {
-            when {
+              when {
                   expression {
                       return isSonarQubeNecessary()
                   }
@@ -72,8 +70,8 @@ pipeline {
             script {
                 if (isNotificationNecessary()) {
                     mineRepository()
-                    emailext attachLog: true, body: email_content(), subject: email_subject(), to: 'junoyoon@gmail.com'
-                    slackSend(channel: "#jenkins", message: "${custom_msg(currentBuild.currentResult)}")
+                    //emailext attachLog: true, body: email_content(), subject: email_subject(), to: 'london.ytk@gmail.com'
+                    //slackSend(channel: "#jenkins", message: "${custom_msg(currentBuild.currentResult)}")
                 }
             }
         }
@@ -100,9 +98,6 @@ pipeline {
     }
 }
 
-
-
-
 // pipeline 바깥쪽 영역은 groovy 사용 가능
 def email_content() {
     return '''이 이메일은 중요한 것이여!!
@@ -119,8 +114,6 @@ def email_subject() {
 def custom_msg(status) {
     return " $status: Job [${env.JOB_NAME}] Logs path: ${env.BUILD_URL}/consoleText"
 }
-
-
 
 def isSonarQubeNecessary() {
     return isMainOrDevelop()
